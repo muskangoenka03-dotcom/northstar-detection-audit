@@ -1,0 +1,26 @@
+node_modules/
+.next/
+out/
+build/
+.env*
+!.env.example
+npm-debug.log*
+yarn-debug.log*
+pnpm-debug.log*
+
+*.tsbuildinfo
+
+# personal data: dataset inputs/evidence and the screenshot cache contain names, emails, phones
+dataset/*
+!dataset/output.csv
+backend/ai_cache.json
+backend/results.json
+
+# local credentials
+*.pem
+*.key
+credentials*.json
+.venv/
+venv/
+backend/__pycache__/
+backend/audit/__pycache__/
