@@ -9,12 +9,13 @@ yarn-debug.log*
 pnpm-debug.log*
 
 *.tsbuildinfo
+__pycache__/
 
 # personal data: dataset inputs/evidence and the screenshot cache contain names, emails, phones
 dataset/*
-!dataset/output.csv
-backend/ai_cache.json
-backend/results.json
+!dataset/README.md
+code/ai_cache.json
+code/results.json
 
 # local credentials
 *.pem
@@ -22,5 +23,3 @@ backend/results.json
 credentials*.json
 .venv/
 venv/
-backend/__pycache__/
-backend/audit/__pycache__/

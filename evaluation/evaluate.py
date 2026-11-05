@@ -1,12 +1,14 @@
-"""Score the engine against dataset/sample_output.csv.  Usage: py evaluate.py [-v]"""
+"""Score the engine against dataset/sample_output.csv.  Usage: py evaluation/evaluate.py [-v]"""
 import csv
 import json
 import sys
 from pathlib import Path
 
-from audit.engine import Auditor
+REPO = Path(__file__).resolve().parent.parent
+DS = REPO / "dataset"
+sys.path.insert(0, str(REPO / "code"))
 
-DS = Path(__file__).resolve().parent.parent / "dataset"
+from audit.engine import Auditor  # noqa: E402
 KEYS = ("phase", "system_id", "resource_id", "operation", "state", "evidence_id")
 
 

@@ -1,6 +1,6 @@
-"""Thin FastAPI adapter: serves backend/results.json (written by run_audit.py) in the dashboard's contract.
+"""Thin FastAPI adapter: serves code/results.json (written by run_audit.py) in the dashboard's contract.
 
-Usage: py -m uvicorn api:app --port 8000
+Usage (from code/): py -m uvicorn api:app --port 8000
 """
 import json
 import os
@@ -219,7 +219,7 @@ def reports():
 
 @app.get("/api/reports/output.csv")
 def output_csv():
-    return FileResponse(DS / "output.csv", media_type="text/csv", filename="output.csv")
+    return FileResponse(ROOT.parent / "output.csv", media_type="text/csv", filename="output.csv")
 
 
 @app.get("/api/reports/evaluation")

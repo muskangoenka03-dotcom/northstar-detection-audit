@@ -19,25 +19,44 @@ On the labelled sample set: **32/32** status accuracy and **30/32** exact step-s
 ## Architecture
 
 ```
-dataset/  (CSV + evidence: SQL, JSON, logs, PDFs, images)
-   │
-   ▼
-parsers.py ──► observations ──► engine.py ──► output.csv / results.json
-   ▲                               │
-ai.py (Claude vision, cached)      ▼
-                              graph.py (identity graph) ──► api.py (FastAPI) ──► Next.js dashboard
+Layer 1  Inputs     dataset/ (CSV + evidence: SQL, JSON, logs, PDFs, images)
+Layer 2  Reading    code/audit/parsers.py  +  code/audit/ai.py (Claude vision, cached)  → observations
+Layer 3  Thinking   identities → identity graph (code/audit/graph.py) → decision engine (code/audit/engine.py)
+Layer 4  Results    code/run_audit.py → output.csv · log.txt · code/results.json
+Layer 5  Sharing    code/api.py (FastAPI, read-only) → code/dashboard (Next.js) → privacy team
+```
+
+See [`docs/architecture.md`](docs/architecture.md), and [`docs/system_design.html`](docs/system_design.html) for an animated walkthrough with examples.
+
+### Repository layout
+
+```
+code/
+  audit/            parsers.py · ai.py · engine.py · graph.py   (the agent)
+  run_audit.py      batch run → output.csv, log.txt, results.json
+  api.py            FastAPI adapter for the dashboard
+  dashboard/        Next.js 15 + Tailwind + Recharts UI
+  requirements.txt
+dataset/            input data (not committed, personal data)
+docs/               architecture, system design page, presentation
+evaluation/         evaluate.py: scores against the labelled samples
+scripts/            start.ps1 (run everything) · run_audit.ps1 (audit + score + test)
+tests/              unit tests per layer + score regression test
+output.csv          the submission: case_id, deletion_status, steps_json
+log.txt             agent trace for the last run (see agent_trace_instructions.md)
+problem_statement.md · AGENTS.md · CLAUDE.md · agent_trace_instructions.md
 ```
 
 | Component | Role |
 | --- | --- |
-| `backend/audit/parsers.py` | Normalises SQL snapshots, JSON exports, five log dialects, handover text and PDFs into per-resource observations |
-| `backend/audit/engine.py` | Identity resolution, resource state at audit time, deletion rules, retention, resurrection and replica-drift detection, step ordering |
-| `backend/audit/graph.py` | Identity graph linking users → identifiers → resources; computes each subject's footprint and the per-case graph shown in the UI |
-| `backend/audit/ai.py` | The only model calls: Claude vision for screenshots and on-demand verdict explanations, both cached |
-| `backend/run_audit.py` | Batch run → `dataset/output.csv` + `backend/results.json` |
-| `backend/evaluate.py` | Scores output against `sample_output.csv` (`-v` prints diffs) |
-| `backend/api.py` | FastAPI adapter serving results to the dashboard |
-| `src/` | Next.js 15 + Tailwind + Recharts dashboard: overview, case register, case detail with identity graph, findings, remediation, evidence, reports |
+| `code/audit/parsers.py` | Normalises SQL snapshots, JSON exports, five log dialects, handover text and PDFs into per-resource observations |
+| `code/audit/engine.py` | Identity resolution, resource state at audit time, deletion rules, retention, resurrection and replica-drift detection, step ordering |
+| `code/audit/graph.py` | Identity graph linking users → identifiers → resources; computes each subject's footprint and the per-case graph shown in the UI |
+| `code/audit/ai.py` | The only model calls: Claude vision for screenshots and on-demand verdict explanations, both cached |
+| `code/run_audit.py` | Batch run → `output.csv`, `log.txt`, `code/results.json` |
+| `evaluation/evaluate.py` | Scores against `dataset/sample_output.csv` (`-v` prints diffs) |
+| `code/api.py` | FastAPI adapter serving results to the dashboard |
+| `code/dashboard/` | Overview, case register, case detail with identity graph, findings, remediation, evidence, reports |
 
 ### Where AI is used
 
@@ -69,8 +88,9 @@ Both results are cached by content hash, so each image is read at most once.
 ### Run everything
 
 ```powershell
-.\start.ps1            # install deps, audit all requests, start API (:8000) and dashboard (:3000)
-.\start.ps1 -SkipAudit # reuse the previous backend/results.json
+.\scripts\start.ps1              # install deps, audit all requests, start API (:8000) and dashboard (:3000)
+.\scripts\start.ps1 -SkipAudit   # reuse the previous code/results.json
+.\scripts\run_audit.ps1          # audit, score and run the tests, no servers
 ```
 
 Open http://localhost:3000.
@@ -78,13 +98,13 @@ Open http://localhost:3000.
 ### Run pieces separately
 
 ```powershell
-cd backend
-py -m pip install -r requirements.txt
-py run_audit.py                       # writes dataset/output.csv and backend/results.json
-py evaluate.py -v                     # score against dataset/sample_output.csv
-py -m uvicorn api:app --port 8000     # API
+py -m pip install -r code\requirements.txt
+py code\run_audit.py                                         # writes output.csv, log.txt, code/results.json
+py evaluation\evaluate.py -v                                 # score against dataset/sample_output.csv
+py -W ignore::ResourceWarning -m unittest discover -s tests  # tests
+cd code; py -m uvicorn api:app --port 8000                   # API
 
-cd ..
+cd code\dashboard
 copy .env.example .env.local          # NEXT_PUBLIC_API_BASE_URL=http://localhost:8000
 npm install
 npm run build; npm run start          # dashboard on http://localhost:3000
@@ -97,7 +117,7 @@ npm run build; npm run start          # dashboard on http://localhost:3000
 | `ANTHROPIC_API_KEY` | backend env | Enables screenshot reading and verdict explanations |
 | `AUDIT_MODEL` | backend env | Claude model ID (defaults to `claude-sonnet-5-5`) |
 | `API_PUBLIC_URL` | backend env | Base URL used in evidence links (defaults to `http://localhost:8000`) |
-| `NEXT_PUBLIC_API_BASE_URL` | `.env.local` | API origin used by the dashboard |
+| `NEXT_PUBLIC_API_BASE_URL` | `code/dashboard/.env.local` | API origin used by the dashboard |
 
 ## Data
 
@@ -111,7 +131,7 @@ dataset/
   evidence/               (PDFs, images, logs, JSON, SQL)
 ```
 
-Only the generated `dataset/output.csv` is versioned. The screenshot cache (`backend/ai_cache.json`) and full results (`backend/results.json`) are also excluded because they contain extracted personal data.
+The answer is written to `output.csv` at the repository root and is versioned, along with `log.txt`. Both hold ids only. The screenshot cache (`code/ai_cache.json`) and full results (`code/results.json`) are excluded because they contain extracted personal data.
 
 ## API
 
@@ -126,7 +146,7 @@ Only the generated `dataset/output.csv` is versioned. The screenshot cache (`bac
 
 ## Project presentation
 
-`Ghost_Data_Audit_Agent.pptx` is a short animated deck explaining the problem, the approach and how the system works.
+`docs/Ghost_Data_Audit_Agent.pptx` is a short animated deck explaining the problem, the approach and how the system works.
 
 ## Authors
 

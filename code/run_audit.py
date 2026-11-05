@@ -1,18 +1,21 @@
-"""Audit every deletion request and write dataset/output.csv plus backend/results.json.
+"""Audit every deletion request and write output.csv, log.txt (repo root) and code/results.json.
 
-Usage: py run_audit.py
+Usage: py code/run_audit.py
 """
 import csv
 import json
+import sys
 import time
 from pathlib import Path
 
-from audit.ai import read_image
-from audit.engine import Auditor
-from evaluate import evaluate
-
 ROOT = Path(__file__).resolve().parent
-DS = ROOT.parent / "dataset"
+REPO = ROOT.parent
+DS = REPO / "dataset"
+sys.path.insert(0, str(REPO / "evaluation"))
+
+from audit.ai import read_image  # noqa: E402
+from audit.engine import Auditor  # noqa: E402
+from evaluate import evaluate  # noqa: E402
 
 
 def _clean(result):
@@ -41,7 +44,7 @@ def main():
     auditor.match_orphans(samples + requests)
     results = [auditor.audit(r) for r in requests]
 
-    with open(DS / "output.csv", "w", newline="", encoding="utf-8") as f:
+    with open(REPO / "output.csv", "w", newline="", encoding="utf-8") as f:
         w = csv.writer(f)
         w.writerow(["case_id", "deletion_status", "steps_json"])
         for r in results:
@@ -58,8 +61,27 @@ def main():
         "unread_images": [k for k, v in auditor.texts.items() if str(v).startswith("[unread")],
     }, default=str), encoding="utf-8")
     done = sum(r["deletion_status"] == "COMPLETE" for r in results)
-    print(f"{len(results)} requests audited in {time.time() - t0:.1f}s: {done} COMPLETE, {len(results) - done} INCOMPLETE")
-    print(f"wrote {DS / 'output.csv'}")
+    summary = f"{len(results)} requests audited in {time.time() - t0:.1f}s: {done} COMPLETE, {len(results) - done} INCOMPLETE"
+    _write_trace(auditor, results, evaluation, summary)
+    print(summary)
+    print(f"wrote {REPO / 'output.csv'} and {REPO / 'log.txt'}")
+
+
+def _write_trace(auditor, results, evaluation, summary):
+    """Agent trace (format in agent_trace_instructions.md): run header, AI usage, then one line per case."""
+    images = [k for k in auditor.texts if auditor.evidence[k]["file_path"].lower().endswith((".png", ".jpg", ".jpeg"))]
+    unread = [k for k in images if str(auditor.texts[k]).startswith("[unread")]
+    lines = [f"run_at={time.strftime('%Y-%m-%dT%H:%M:%SZ', time.gmtime())}",
+             f"summary={summary}",
+             f"evaluation=status_accuracy {evaluation['status_accuracy']:.2%}, exact_match {evaluation['exact_match']:.2%} on {evaluation['cases']} sample cases",
+             f"ai_screenshot_reads={len(images) - len(unread)} unread={len(unread)}", ""]
+    for r in results:
+        phases = [s["phase"] for s in r["steps"]]
+        inferred = any(i.get("inferred") for i in r["items"])
+        lines.append(f"{r['case_id']} user={r['user_id']} status={r['deletion_status']} "
+                     f"findings={phases.count('FINDING')} remediations={phases.count('REMEDIATION')} "
+                     f"verifications={phases.count('VERIFICATION')} records={len(r['items'])} inferred_link={'yes' if inferred else 'no'}")
+    (REPO / "log.txt").write_text("\n".join(lines) + "\n", encoding="utf-8")
 
 
 if __name__ == "__main__":

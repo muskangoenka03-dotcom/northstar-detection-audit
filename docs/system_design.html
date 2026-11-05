@@ -1,0 +1,682 @@
+<title>Northstar Deletion Audit</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,700&family=Source+Sans+3:wght@400;600&family=JetBrains+Mono:wght@500&display=swap">
+<style>
+/* Layout: one calm reading column; the system is told as a journey of a single deletion request, left to right then top to bottom */
+:root {
+  --bg: #f5f6fa; --surface: #ffffff; --ink: #1b2233; --muted: #5d6578; --line: #dde1ea;
+  --accent: #3b4fd8;      /* the auditor */
+  --ghost: #d9485f;       /* data left behind */
+  --ghost-soft: #fbe9ec;
+  --ok: #1f8a5c; --ok-soft: #e3f4ec;
+  --warn: #b7791f; --warn-soft: #fbf1df;
+  --accent-soft: #e8ebfc;
+  --display: "Bricolage Grotesque", "Segoe UI", system-ui, sans-serif;
+  --body: "Source Sans 3", "Segoe UI", system-ui, sans-serif;
+  --mono: "JetBrains Mono", ui-monospace, Consolas, monospace;
+}
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) {
+  --bg: #12151d; --surface: #1a1e29; --ink: #e7eaf2; --muted: #9aa2b5; --line: #2b3140;
+  --accent: #8b9bff; --ghost: #ff7d90; --ghost-soft: #3a1f26; --ok: #4fcf96; --ok-soft: #173327;
+  --warn: #f0b75a; --warn-soft: #362a16; --accent-soft: #222842; color-scheme: dark } }
+:root[data-theme="dark"] {
+  --bg: #12151d; --surface: #1a1e29; --ink: #e7eaf2; --muted: #9aa2b5; --line: #2b3140;
+  --accent: #8b9bff; --ghost: #ff7d90; --ghost-soft: #3a1f26; --ok: #4fcf96; --ok-soft: #173327;
+  --warn: #f0b75a; --warn-soft: #362a16; --accent-soft: #222842; color-scheme: dark }
+
+body { background: var(--bg); color: var(--ink); font: 17px/1.6 var(--body); }
+.wrap { max-width: 920px; margin: 0 auto; padding-block: 56px 80px; padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); display: grid; gap: 64px; }
+h1, h2, h3 { font-family: var(--display); line-height: 1.15; text-wrap: balance; margin: 0; }
+h1 { font-size: clamp(2.1rem, 5vw, 3.2rem); font-weight: 700; letter-spacing: -0.02em; }
+h2 { font-size: clamp(1.5rem, 3vw, 1.9rem); font-weight: 700; }
+h3 { font-size: 1.12rem; font-weight: 500; }
+p { margin: 0; max-width: 65ch; }
+.eyebrow { font: 600 0.75rem/1 var(--body); text-transform: uppercase; letter-spacing: 0.12em; color: var(--accent); }
+.lede { font-size: 1.2rem; color: var(--muted); }
+section { display: grid; gap: 20px; }
+.mono { font-family: var(--mono); font-size: 0.85em; }
+.ghost { color: var(--ghost); } .ok { color: var(--ok); }
+
+/* hero */
+.hero { display: grid; gap: 18px; }
+.stats { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; margin-top: 12px; }
+.stat { background: var(--surface); border: 1px solid var(--line); border-radius: 14px; padding: 16px 18px; }
+.stat b { display: block; font: 700 2rem/1.1 var(--display); font-variant-numeric: tabular-nums; }
+.stat span { color: var(--muted); font-size: 0.92rem; }
+
+/* analogy */
+.analogy { background: var(--accent-soft); border-radius: 18px; padding: 24px 26px; display: grid; gap: 10px; }
+
+/* journey */
+.journey { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 10px; counter-reset: step; }
+.stop { background: var(--surface); border: 1px solid var(--line); border-radius: 14px; padding: 16px 14px; display: grid; gap: 6px; align-content: start; position: relative; min-width: 0; }
+.stop::before { counter-increment: step; content: counter(step); font: 700 0.85rem/1 var(--display); width: 26px; height: 26px; border-radius: 50%; display: grid; place-items: center; background: var(--accent); color: var(--surface); }
+.stop h3 { font-size: 1rem; }
+.stop p { font-size: 0.9rem; color: var(--muted); }
+.stop.ai { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-soft); }
+.tag { justify-self: start; font: 600 0.68rem/1 var(--body); letter-spacing: 0.08em; text-transform: uppercase; padding: 5px 8px; border-radius: 99px; background: var(--accent-soft); color: var(--accent); }
+
+/* hiding places */
+.places { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 12px; }
+.place { background: var(--surface); border: 1px solid var(--line); border-radius: 14px; padding: 16px 18px; display: grid; gap: 4px; }
+.place b { font-family: var(--display); font-weight: 500; font-size: 1.05rem; }
+.place span { color: var(--muted); font-size: 0.93rem; }
+.bar { height: 8px; border-radius: 99px; background: var(--ghost-soft); overflow: hidden; margin-top: 6px; }
+.bar i { display: block; height: 100%; background: var(--ghost); border-radius: 99px; }
+.count { font: 500 0.8rem var(--mono); color: var(--ghost); }
+
+/* web diagram */
+.diagram { background: var(--surface); border: 1px solid var(--line); border-radius: 18px; padding: 12px; overflow-x: auto; }
+.diagram svg { display: block; width: 100%; min-width: 560px; height: auto; }
+.legend { display: flex; flex-wrap: wrap; gap: 16px; font-size: 0.88rem; color: var(--muted); }
+.legend span::before { content: ""; display: inline-block; width: 10px; height: 10px; border-radius: 50%; margin-right: 6px; vertical-align: -1px; background: var(--c); }
+
+/* fix order */
+.fix { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
+.fix div { border-radius: 14px; padding: 18px; display: grid; gap: 6px; align-content: start; }
+.fix .f1 { background: var(--warn-soft); } .fix .f2 { background: var(--ghost-soft); } .fix .f3 { background: var(--ok-soft); }
+.fix small { font: 600 0.72rem/1 var(--body); letter-spacing: 0.1em; text-transform: uppercase; color: var(--muted); }
+.fix p { font-size: 0.95rem; }
+
+/* example case */
+.case { background: var(--surface); border: 1px solid var(--line); border-radius: 18px; overflow: hidden; }
+.case header { padding: 16px 20px; display: flex; flex-wrap: wrap; justify-content: space-between; gap: 10px; align-items: center; border-bottom: 1px solid var(--line); }
+.pill { font: 600 0.75rem/1 var(--body); letter-spacing: 0.06em; padding: 6px 10px; border-radius: 99px; }
+.pill.bad { background: var(--ghost-soft); color: var(--ghost); } .pill.good { background: var(--ok-soft); color: var(--ok); }
+.case ol { margin: 0; padding: 0; list-style: none; }
+.case li { display: grid; grid-template-columns: 120px minmax(0, 1fr); gap: 14px; padding: 12px 20px; border-bottom: 1px solid var(--line); font-size: 0.95rem; }
+.case li:last-child { border-bottom: 0; }
+.phase { font: 600 0.72rem/1.9 var(--body); letter-spacing: 0.08em; text-transform: uppercase; }
+.p-find { color: var(--ghost); } .p-fix { color: var(--warn); } .p-check { color: var(--ok); }
+
+/* AI split */
+.split { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+.split > div { background: var(--surface); border: 1px solid var(--line); border-radius: 14px; padding: 20px; display: grid; gap: 10px; align-content: start; }
+.split ul { margin: 0; padding-left: 18px; display: grid; gap: 6px; color: var(--muted); }
+.split li strong { color: var(--ink); font-weight: 600; }
+
+/* glossary */
+dl { margin: 0; display: grid; grid-template-columns: max-content minmax(0, 1fr); gap: 10px 20px; }
+dt { font-family: var(--display); font-weight: 500; }
+dd { margin: 0; color: var(--muted); }
+
+/* architecture flow */
+.arch { display: grid; justify-items: stretch; }
+.band { display: grid; grid-template-columns: 170px minmax(0, 1fr); gap: 18px; align-items: center; background: var(--surface); border: 1px solid var(--line); border-radius: 16px; padding: 16px 18px; }
+.band-label { display: grid; gap: 4px; }
+.band-label small { font: 600 0.7rem/1 var(--body); letter-spacing: 0.12em; text-transform: uppercase; color: var(--accent); }
+.band-label b { font: 700 1.05rem/1.2 var(--display); }
+.band-label span { font-size: 0.85rem; color: var(--muted); line-height: 1.35; }
+.nodes { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; min-width: 0; }
+.node { background: var(--bg); border: 1px solid var(--line); border-radius: 10px; padding: 9px 12px; display: grid; gap: 2px; min-width: 0; }
+.node b { font-weight: 600; font-size: 0.95rem; line-height: 1.25; }
+.node code { font: 500 0.72rem/1.3 var(--mono); color: var(--muted); overflow-wrap: anywhere; }
+.node.ai { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-soft); }
+.node.ai b::after { content: " · AI"; color: var(--accent); }
+.node.out { border-color: var(--ok); background: var(--ok-soft); }
+.node.person { border-color: var(--ink); }
+.to { color: var(--accent); font: 700 1.1rem/1 var(--display); padding: 0 2px; }
+.down { display: grid; place-items: center; height: 38px; color: var(--accent); }
+.down svg { width: 18px; height: 38px; }
+.down-label { font-size: 0.8rem; color: var(--muted); margin-left: 8px; }
+.down { grid-auto-flow: column; justify-content: center; align-items: center; }
+@media (max-width: 760px) { .band { grid-template-columns: minmax(0, 1fr); gap: 10px; } }
+
+/* data walkthrough: stepper on the left, the actual data on the right */
+.walk { display: grid; grid-template-columns: 220px minmax(0, 1fr); gap: 16px; align-items: start; }
+.walk-top { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; justify-content: space-between; }
+.chips { display: flex; flex-wrap: wrap; gap: 8px; }
+.chip { font: 600 0.9rem/1 var(--body); padding: 10px 14px; border-radius: 99px; border: 1px solid var(--line); background: var(--surface); color: var(--ink); cursor: pointer; }
+.chip[aria-pressed="true"] { background: var(--accent); border-color: var(--accent); color: var(--surface); }
+.ctrl { display: flex; gap: 6px; }
+.btn { font: 600 0.9rem/1 var(--body); padding: 10px 14px; border-radius: 10px; border: 1px solid var(--accent); background: var(--accent-soft); color: var(--accent); cursor: pointer; }
+.btn.primary { background: var(--accent); color: var(--surface); }
+.chip:focus-visible, .btn:focus-visible, .stage-btn:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
+.stages { list-style: none; margin: 0; padding: 0; display: grid; gap: 4px; position: sticky; top: calc(env(safe-area-inset-top, 0px) + 12px); }
+.stage-btn { width: 100%; text-align: left; display: grid; grid-template-columns: 26px minmax(0, 1fr); gap: 10px; align-items: center; padding: 9px 10px; border-radius: 10px; border: 1px solid transparent; background: none; color: var(--muted); font: 500 0.92rem/1.25 var(--body); cursor: pointer; }
+.stage-btn span:first-child { width: 26px; height: 26px; border-radius: 50%; display: grid; place-items: center; font: 700 0.8rem/1 var(--display); background: var(--line); color: var(--muted); }
+.stage-btn.done span:first-child { background: var(--accent-soft); color: var(--accent); }
+.stage-btn[aria-current="step"] { background: var(--surface); border-color: var(--accent); color: var(--ink); font-weight: 600; }
+.stage-btn[aria-current="step"] span:first-child { background: var(--accent); color: var(--surface); }
+.canvas { background: var(--surface); border: 1px solid var(--line); border-radius: 18px; padding: 20px; display: grid; gap: 16px; min-width: 0; min-height: 520px; align-content: start; }
+.canvas-head { display: grid; gap: 6px; }
+.canvas-head small { font: 600 0.72rem/1 var(--body); letter-spacing: 0.1em; text-transform: uppercase; color: var(--accent); }
+.canvas-head h3 { font-size: 1.3rem; }
+.canvas-head p { color: var(--muted); }
+.insight { display: flex; gap: 10px; align-items: flex-start; background: var(--warn-soft); border-radius: 12px; padding: 12px 14px; font-size: 0.95rem; }
+.insight b { color: var(--warn); white-space: nowrap; }
+.timer { height: 3px; border-radius: 99px; background: var(--line); overflow: hidden; }
+.timer i { display: block; height: 100%; width: 0; background: var(--accent); }
+.timer.run i { animation: fill var(--t, 7s) linear forwards; }
+@keyframes fill { to { width: 100%; } }
+
+/* things that arrive one after another */
+.in { animation: rise .45s ease-out both; animation-delay: var(--d, 0s); }
+@keyframes rise { from { opacity: 0; transform: translateY(10px); } }
+mark { background: transparent; color: inherit; border-radius: 4px; padding: 0 2px; animation: hl .5s ease-out forwards; animation-delay: var(--d, .6s); }
+@keyframes hl { to { background: var(--warn-soft); box-shadow: 0 0 0 1px var(--warn); } }
+
+.files { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 12px; }
+.file { border: 1px solid var(--line); border-radius: 12px; overflow: hidden; background: var(--bg); min-width: 0; }
+.file header { display: flex; justify-content: space-between; gap: 8px; padding: 8px 12px; border-bottom: 1px solid var(--line); font: 500 0.75rem/1.3 var(--mono); color: var(--muted); }
+.file header b { font: 600 0.7rem/1.3 var(--body); letter-spacing: 0.08em; text-transform: uppercase; color: var(--accent); white-space: nowrap; }
+.file pre { margin: 0; padding: 12px; font: 500 0.78rem/1.55 var(--mono); white-space: pre-wrap; overflow-wrap: anywhere; color: var(--ink); }
+.shot { margin: 12px; border: 1px solid var(--line); border-radius: 8px; background: var(--surface); overflow: hidden; }
+.shot-bar { display: flex; gap: 5px; align-items: center; padding: 7px 10px; background: var(--line); font: 600 0.75rem var(--body); color: var(--muted); }
+.shot-bar i { width: 8px; height: 8px; border-radius: 50%; background: var(--muted); opacity: .5; }
+.shot dl { grid-template-columns: max-content minmax(0, 1fr); gap: 4px 14px; padding: 10px 12px; font-size: 0.85rem; }
+.shot dt { font: 600 0.8rem var(--body); color: var(--muted); }
+.shot dd { color: var(--ink); margin: 0; }
+
+.tbl-wrap { overflow-x: auto; border: 1px solid var(--line); border-radius: 12px; }
+.tbl { width: 100%; border-collapse: collapse; font-size: 0.88rem; min-width: 560px; }
+.tbl th { text-align: left; font: 600 0.7rem/1 var(--body); letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); padding: 10px 12px; background: var(--bg); border-bottom: 1px solid var(--line); }
+.tbl td { padding: 10px 12px; border-bottom: 1px solid var(--line); vertical-align: top; }
+.tbl tr:last-child td { border-bottom: 0; }
+.tbl .mono { font-size: 0.8rem; }
+.src { font: 600 0.7rem/1 var(--body); padding: 4px 7px; border-radius: 6px; background: var(--bg); border: 1px solid var(--line); color: var(--muted); white-space: nowrap; }
+.src.ai { border-color: var(--accent); color: var(--accent); background: var(--accent-soft); }
+.chip-s { display: inline-block; font: 600 0.75rem/1 var(--body); padding: 5px 9px; border-radius: 99px; white-space: nowrap; }
+.chip-s.ok { background: var(--ok-soft); color: var(--ok); } .chip-s.bad { background: var(--ghost-soft); color: var(--ghost); } .chip-s.warn { background: var(--warn-soft); color: var(--warn); } .chip-s.id { background: var(--accent-soft); color: var(--accent); }
+
+.profile { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 14px; align-items: center; border: 1px solid var(--line); border-radius: 12px; padding: 14px; background: var(--bg); }
+.avatar { width: 48px; height: 48px; border-radius: 50%; background: var(--accent); color: var(--surface); display: grid; place-items: center; font: 700 1.1rem var(--display); }
+.ids { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 6px; }
+.idtag { display: grid; gap: 2px; border: 1px solid var(--line); border-radius: 10px; padding: 7px 10px; background: var(--surface); }
+.idtag b { font: 500 0.8rem var(--mono); }
+.idtag span { font-size: 0.75rem; color: var(--muted); }
+.idtag.old { border-color: var(--warn); }
+
+.graph { border: 1px solid var(--line); border-radius: 12px; background: var(--bg); overflow-x: auto; }
+.graph svg { display: block; width: 100%; min-width: 520px; height: auto; }
+.gn { animation: fadein .45s ease-out both; animation-delay: var(--d, 0s); }
+@keyframes fadein { from { opacity: 0; } }
+.gl { stroke-dasharray: 400; stroke-dashoffset: 400; animation: draw .6s ease-out forwards; animation-delay: var(--d, 0s); }
+@keyframes draw { to { stroke-dashoffset: 0; } }
+
+.timeline { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 0; position: relative; padding-top: 6px; }
+.timeline::before { content: ""; position: absolute; left: 12%; right: 12%; top: 19px; height: 2px; background: var(--line); }
+.tl { display: grid; justify-items: center; gap: 6px; text-align: center; position: relative; font-size: 0.82rem; }
+.tl i { width: 28px; height: 28px; border-radius: 50%; display: grid; place-items: center; font: 700 0.8rem var(--body); font-style: normal; color: var(--surface); }
+.tl b { font-weight: 600; } .tl span { color: var(--muted); }
+
+.verdict { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; justify-content: space-between; border-radius: 12px; padding: 14px 16px; }
+.verdict.bad { background: var(--ghost-soft); } .verdict.good { background: var(--ok-soft); }
+.verdict strong { font: 700 1.25rem var(--display); }
+.verdict.bad strong { color: var(--ghost); } .verdict.good strong { color: var(--ok); }
+
+.steps { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; counter-reset: s; }
+.steps li { counter-increment: s; display: grid; grid-template-columns: 28px 118px minmax(0, 1fr); gap: 10px; align-items: baseline; padding: 9px 12px; border-radius: 10px; background: var(--bg); font-size: 0.92rem; }
+.steps li::before { content: counter(s); font: 700 0.8rem var(--display); color: var(--muted); }
+.steps .ev { font: 500 0.75rem var(--mono); color: var(--muted); }
+.groups { display: grid; gap: 4px; font-size: 0.82rem; color: var(--muted); }
+
+.csv { border: 1px solid var(--line); border-radius: 12px; overflow: hidden; }
+.csv header { padding: 8px 12px; border-bottom: 1px solid var(--line); font: 500 0.75rem var(--mono); color: var(--muted); background: var(--bg); }
+.csv pre { margin: 0; padding: 12px; font: 500 0.78rem/1.6 var(--mono); white-space: pre-wrap; overflow-wrap: anywhere; }
+.csv .k { color: var(--accent); } .csv .bad { color: var(--ghost); font-weight: 700; } .csv .good { color: var(--ok); font-weight: 700; }
+.typing { overflow: hidden; }
+
+@media (max-width: 760px) {
+  .walk { grid-template-columns: minmax(0, 1fr); }
+  .stages { position: static; display: flex; overflow-x: auto; gap: 6px; padding-bottom: 4px; }
+  .stage-btn { width: auto; white-space: nowrap; grid-template-columns: 22px auto; }
+  .canvas { padding: 14px; min-height: 0; }
+  .steps li { grid-template-columns: 22px minmax(0, 1fr); } .steps li .phase { grid-column: 2; }
+  .steps li > span:last-child { grid-column: 2; }
+}
+@media (prefers-reduced-motion: reduce) { .in, .gn, mark { animation-duration: 0s; animation-delay: 0s !important; } .gl { animation: none; stroke-dashoffset: 0; } .timer.run i { animation: none; } }
+
+footer { color: var(--muted); font-size: 0.9rem; border-top: 1px solid var(--line); padding-top: 20px; }
+
+@media (max-width: 760px) {
+  .journey { grid-template-columns: minmax(0, 1fr); }
+  .fix, .split { grid-template-columns: minmax(0, 1fr); }
+  .stats { grid-template-columns: minmax(0, 1fr); }
+  .case li { grid-template-columns: minmax(0, 1fr); gap: 2px; }
+  dl { grid-template-columns: minmax(0, 1fr); } dd { margin-bottom: 8px; }
+}
+</style>
+
+<main class="wrap">
+
+  <header class="hero">
+    <span class="eyebrow">Northstar Shop · How the system works</span>
+    <h1>When a customer says “delete me,” is their data really gone?</h1>
+    <p class="lede">Northstar marks deletion requests as done. But copies of a person’s data hide in many places: search, support tickets, analytics, backups. This system checks every request against the evidence and finds what was left behind.</p>
+    <div class="stats">
+      <div class="stat"><b>518</b><span>deletion requests checked</span></div>
+      <div class="stat"><b class="ghost">68%</b><span>still left data behind (351 requests)</span></div>
+      <div class="stat"><b class="ok">167</b><span>proven fully deleted</span></div>
+    </div>
+  </header>
+
+  <section>
+    <div class="analogy">
+      <span class="eyebrow">An everyday way to think about it</span>
+      <p>Imagine you move house and ask the post office to forget you. They say “done.” But your name is still on the gym membership, the dentist’s files, an old storage box, and a friend’s address book that copies itself to the post office every night. <strong>This system is the detective who visits every one of those places and writes the to-do list to finish the job.</strong></p>
+    </div>
+  </section>
+
+  <section>
+    <span class="eyebrow">System architecture</span>
+    <h2>The whole system on one page</h2>
+    <p>Read it top to bottom: information comes in, gets read, gets reasoned about, and comes out as results the privacy team can act on. Small grey text shows the technical name of each part.</p>
+    <div class="arch" role="group" aria-label="Architecture flow: inputs flow into the evidence reader and AI screenshot reader, then into the identity finder, identity web, decision engine and fix-plan writer, producing results files that the API server delivers to the dashboard for the privacy team.">
+
+      <div class="band">
+        <div class="band-label"><small>Layer 1</small><b>What goes in</b><span>The raw material</span></div>
+        <div class="nodes">
+          <div class="node"><b>Deletion requests</b><code>deletion_requests.csv</code></div>
+          <div class="node"><b>Customer details &amp; history</b><code>user_identities · user_audit_log</code></div>
+          <div class="node"><b>Deletion rules</b><code>deletion_rules.csv</code></div>
+          <div class="node"><b>Evidence files</b><code>SQL · JSON · logs · PDFs · screenshots</code></div>
+        </div>
+      </div>
+      <div class="down" aria-hidden="true"><svg viewBox="0 0 18 38"><path d="M9 2v30M3 26l6 8 6-8" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg><span class="down-label">files</span></div>
+
+      <div class="band">
+        <div class="band-label"><small>Layer 2</small><b>Reading</b><span>Every format turned into one simple list</span></div>
+        <div class="nodes">
+          <div class="node"><b>Evidence reader</b><code>parsers.py</code></div>
+          <div class="node ai"><b>Screenshot reader</b><code>Claude vision · saved in a cache</code></div>
+          <span class="to" aria-hidden="true">→</span>
+          <div class="node"><b>One list of sightings</b><code>“record X seen in system Y at time Z”</code></div>
+        </div>
+      </div>
+      <div class="down" aria-hidden="true"><svg viewBox="0 0 18 38"><path d="M9 2v30M3 26l6 8 6-8" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg><span class="down-label">sightings</span></div>
+
+      <div class="band">
+        <div class="band-label"><small>Layer 3</small><b>Thinking</b><span>The brain, run for each request</span></div>
+        <div class="nodes">
+          <div class="node"><b>Identity finder</b><code>every email &amp; phone they used</code></div>
+          <span class="to" aria-hidden="true">→</span>
+          <div class="node"><b>Identity web</b><code>graph.py · follow the trail</code></div>
+          <span class="to" aria-hidden="true">→</span>
+          <div class="node"><b>Decision engine</b><code>engine.py · is anything left?</code></div>
+          <span class="to" aria-hidden="true">→</span>
+          <div class="node"><b>Fix-plan writer</b><code>stop → clean → prove</code></div>
+        </div>
+      </div>
+      <div class="down" aria-hidden="true"><svg viewBox="0 0 18 38"><path d="M9 2v30M3 26l6 8 6-8" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg><span class="down-label">verdicts &amp; plans</span></div>
+
+      <div class="band">
+        <div class="band-label"><small>Layer 4</small><b>Results</b><span>Saved once, about 30 seconds for all 518</span></div>
+        <div class="nodes">
+          <div class="node out"><b>Results file</b><code>output.csv · one row per request</code></div>
+          <div class="node out"><b>Full detail</b><code>results.json · evidence, graph, checks</code></div>
+        </div>
+      </div>
+      <div class="down" aria-hidden="true"><svg viewBox="0 0 18 38"><path d="M9 2v30M3 26l6 8 6-8" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg><span class="down-label">served to the browser</span></div>
+
+      <div class="band">
+        <div class="band-label"><small>Layer 5</small><b>Sharing</b><span>Read-only: nobody can change a verdict</span></div>
+        <div class="nodes">
+          <div class="node"><b>API server</b><code>api.py · FastAPI</code></div>
+          <span class="to" aria-hidden="true">→</span>
+          <div class="node"><b>Dashboard</b><code>Next.js website</code></div>
+          <span class="to" aria-hidden="true">→</span>
+          <div class="node person"><b>Privacy team</b><code>reviews cases, sends fixes</code></div>
+          <div class="node ai"><b>“Explain verdict”</b><code>Claude · plain-English summary</code></div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section id="watch">
+    <span class="eyebrow">See it working, with real-looking data</span>
+    <h2>Follow the actual data through the system</h2>
+    <p>Pick a customer and press Play. You’ll see the real kinds of files the system reads, and how each one is turned into a table, matched to the person, checked against the rules, and finally turned into the answer. The customers are made up; the formats and logic are exactly what the system does.</p>
+    <div class="walk-top">
+      <div class="chips" role="group" aria-label="Choose an example">
+        <button class="chip" id="wx-a" data-ex="a" aria-pressed="true">Customer A · changed their email</button>
+        <button class="chip" id="wx-b" data-ex="b" aria-pressed="false">Customer B · data came back</button>
+      </div>
+      <div class="ctrl">
+        <button class="btn" id="w-prev" aria-label="Previous stage">←</button>
+        <button class="btn primary" id="w-play">▶ Play</button>
+        <button class="btn" id="w-next" aria-label="Next stage">→</button>
+      </div>
+    </div>
+    <div class="walk">
+      <ol class="stages" id="w-stages"></ol>
+      <div class="canvas" id="w-canvas" aria-live="polite"></div>
+    </div>
+  </section>
+
+  <section>
+    <span class="eyebrow">The journey of one request</span>
+    <h2>Five steps, from “please delete me” to a fix list</h2>
+    <div class="journey">
+      <div class="stop"><h3>Read the evidence</h3><p>Database copies, exported files, system logs, PDFs and screenshots, each in its own format, are turned into one simple list of sightings.</p></div>
+      <div class="stop ai"><span class="tag">AI helps here</span><h3>Read the screenshots</h3><p>Claude AI looks at screenshots of admin screens and writes down what it sees. Each image is read only once and saved.</p></div>
+      <div class="stop"><h3>Know every name they used</h3><p>People change emails and phone numbers. We gather their old and current details, and notice when an email later belonged to someone else.</p></div>
+      <div class="stop"><h3>Follow the trail</h3><p>Starting from the person, we follow links to every record that points back to them, like pulling a thread.</p></div>
+      <div class="stop"><h3>Decide and write the plan</h3><p>Is anything still there? If yes, list the fixes in a safe order. Either way, list the checks that prove it’s gone.</p></div>
+    </div>
+  </section>
+
+  <section>
+    <span class="eyebrow">Step 4, up close</span>
+    <h2>Following the trail: the identity web</h2>
+    <p>Each person sits at the centre. Around them are the details they’ve used. Around those are the records that mention them. If a record can be reached from the person, it belongs to their case. If a detail is shared with another person, the trail stops there so nobody else’s data gets pulled in by mistake.</p>
+    <div class="diagram" role="img" aria-label="Diagram: a customer in the centre, connected to two emails and a phone number, which connect to records in search, support, analytics and backups. An old email that was later reused by another person is shown as a blocked path.">
+      <svg viewBox="0 0 760 360" xmlns="http://www.w3.org/2000/svg" font-family="Source Sans 3, Segoe UI, sans-serif" font-size="13">
+        <g stroke-width="2" fill="none" style="stroke:var(--line)">
+          <line x1="380" y1="180" x2="230" y2="100"/><line x1="380" y1="180" x2="530" y2="100"/><line x1="380" y1="180" x2="380" y2="290"/>
+          <line x1="230" y1="100" x2="90" y2="50"/><line x1="230" y1="100" x2="90" y2="170"/>
+          <line x1="530" y1="100" x2="670" y2="50"/><line x1="380" y1="290" x2="200" y2="310"/><line x1="380" y1="290" x2="560" y2="310"/>
+        </g>
+        <line x1="530" y1="100" x2="670" y2="170" stroke-width="2" stroke-dasharray="5 5" style="stroke:var(--muted)"/>
+        <g font-size="11" text-anchor="middle" style="fill:var(--muted)"><text x="612" y="152">stops here</text></g>
+
+        <circle cx="380" cy="180" r="38" style="fill:var(--accent)"/>
+        <text x="380" y="176" text-anchor="middle" font-weight="600" style="fill:var(--surface)">Customer</text>
+        <text x="380" y="192" text-anchor="middle" font-size="11" style="fill:var(--surface)">user_17</text>
+
+        <g stroke-width="1.5" style="fill:var(--accent-soft);stroke:var(--accent)">
+          <rect x="165" y="82" width="130" height="36" rx="18"/><rect x="465" y="82" width="130" height="36" rx="18"/><rect x="315" y="272" width="130" height="36" rx="18"/>
+        </g>
+        <g text-anchor="middle" style="fill:var(--ink)"><text x="230" y="105">current email</text><text x="530" y="105">old email</text><text x="380" y="295">phone number</text></g>
+
+        <g stroke-width="1.5">
+          <rect x="20" y="32" width="140" height="36" rx="8" style="fill:var(--ghost-soft);stroke:var(--ghost)"/>
+          <rect x="20" y="152" width="140" height="36" rx="8" style="fill:var(--ok-soft);stroke:var(--ok)"/>
+          <rect x="600" y="32" width="140" height="36" rx="8" style="fill:var(--ghost-soft);stroke:var(--ghost)"/>
+          <rect x="130" y="292" width="140" height="36" rx="8" style="fill:var(--ghost-soft);stroke:var(--ghost)"/>
+          <rect x="490" y="292" width="140" height="36" rx="8" style="fill:var(--ok-soft);stroke:var(--ok)"/>
+          <rect x="600" y="152" width="140" height="36" rx="8" stroke-dasharray="4 4" style="fill:var(--surface);stroke:var(--muted)"/>
+        </g>
+        <g text-anchor="middle" style="fill:var(--ink)">
+          <text x="90" y="55">Search index</text><text x="90" y="175">Account (deleted)</text>
+          <text x="670" y="55">Support ticket</text><text x="200" y="315">Backup copy</text>
+          <text x="560" y="315">Analytics (anonymised)</text><text x="670" y="175" style="fill:var(--muted)">Someone else’s order</text>
+        </g>
+      </svg>
+    </div>
+    <div class="legend"><span style="--c: var(--ghost)">Data still there</span><span style="--c: var(--ok)">Properly cleaned</span><span style="--c: var(--accent)">The person and their details</span><span style="--c: var(--muted)">Not theirs, left alone</span></div>
+  </section>
+
+  <section>
+    <span class="eyebrow">What it found</span>
+    <h2>Where leftover data was hiding</h2>
+    <p>Across all requests, these are the places that still held someone’s personal details after they asked to be deleted.</p>
+    <div class="places">
+      <div class="place"><b>Search index</b><span>The site’s search still finds the person.</span><div class="bar"><i style="width:100%"></i></div><span class="count">269 findings</span></div>
+      <div class="place"><b>Support tickets</b><span>Old help-desk conversations with their name and email.</span><div class="bar"><i style="width:54%"></i></div><span class="count">145 findings</span></div>
+      <div class="place"><b>Sync pipelines</b><span>Connections that copy data back in, even after it’s deleted.</span><div class="bar"><i style="width:41%"></i></div><span class="count">111 findings</span></div>
+      <div class="place"><b>Analytics</b><span>Reports that still name people instead of counting them anonymously.</span><div class="bar"><i style="width:27%"></i></div><span class="count">72 findings</span></div>
+      <div class="place"><b>Accounts</b><span>The main account itself was never actually removed.</span><div class="bar"><i style="width:21%"></i></div><span class="count">57 findings</span></div>
+      <div class="place"><b>Backups</b><span>Saved copies that would bring the data back if restored.</span><div class="bar"><i style="width:8%"></i></div><span class="count">flagged as a restore risk</span></div>
+    </div>
+  </section>
+
+  <section>
+    <span class="eyebrow">Why the order of fixes matters</span>
+    <h2>Turn off the tap before mopping the floor</h2>
+    <p>If you delete data while a sync is still copying it back in, it simply returns. So every fix plan follows the same three stages.</p>
+    <div class="fix">
+      <div class="f1"><small>First</small><h3>Stop the source</h3><p>Switch off syncs that would re-copy the data, and block backups from being restored.</p></div>
+      <div class="f2"><small>Then</small><h3>Clean it up</h3><p><strong>Delete</strong> what shouldn’t exist, <strong>redact</strong> (black out) personal details in records that must stay, <strong>anonymise</strong> analytics.</p></div>
+      <div class="f3"><small>Finally</small><h3>Prove it</h3><p>Check each place again so there’s evidence the data is truly gone, cleaned, or legitimately kept.</p></div>
+    </div>
+  </section>
+
+  <section>
+    <span class="eyebrow">What a result looks like</span>
+    <h2>An example case, in plain words</h2>
+    <div class="case">
+      <header><strong>Request from a customer, reported as “deleted”</strong><span class="pill bad">INCOMPLETE</span></header>
+      <ol>
+        <li><span class="phase p-find">Found</span><span>Their account is gone, but the search index still returns their name and email.</span></li>
+        <li><span class="phase p-find">Found</span><span>A nightly sync job re-created their search record the day after deletion.</span></li>
+        <li><span class="phase p-fix">Fix 1</span><span>Switch off the sync that keeps re-copying them.</span></li>
+        <li><span class="phase p-fix">Fix 2</span><span>Delete the search record.</span></li>
+        <li><span class="phase p-check">Check</span><span>Account: confirm it’s absent.</span></li>
+        <li><span class="phase p-check">Check</span><span>Search record: confirm it’s absent, and the sync is confirmed off.</span></li>
+      </ol>
+    </div>
+    <p>Each finding points to the exact piece of evidence it came from, so anyone can double-check the decision.</p>
+  </section>
+
+  <section>
+    <span class="eyebrow">Rules it respects</span>
+    <h2>Not everything should be deleted</h2>
+    <div class="places">
+      <div class="place"><b>Security logs</b><span>Kept for a set period by law, then they must go. The system knows the difference.</span></div>
+      <div class="place"><b>Legal holds</b><span>Records under a legal case are left alone until the hold is lifted.</span></div>
+      <div class="place"><b>Tombstones</b><span>A tiny “this account was deleted” marker may stay, but only with the ID number. No name, email or phone.</span></div>
+    </div>
+  </section>
+
+  <section>
+    <span class="eyebrow">Where AI is used, and where it isn’t</span>
+    <h2>AI only where rules can’t do the job</h2>
+    <div class="split">
+      <div><h3>Handled by clear rules</h3><ul>
+        <li><strong>Reading files and logs.</strong> Same input, same answer, every time.</li>
+        <li><strong>Deciding complete or incomplete.</strong> Fully explainable; no guessing.</li>
+        <li><strong>Writing the fix plan.</strong> Follows Northstar’s deletion rules exactly.</li>
+      </ul></div>
+      <div><h3>Handled by Claude AI</h3><ul>
+        <li><strong>Reading screenshots.</strong> Rules can’t read pictures, so AI describes what’s on screen.</li>
+        <li><strong>Explaining a verdict.</strong> A plain-English summary when someone clicks “Explain verdict.”</li>
+        <li>AI never changes a decision, and every answer is saved so it’s never paid for twice.</li>
+      </ul></div>
+    </div>
+  </section>
+
+  <section>
+    <span class="eyebrow">How people use it</span>
+    <h2>A dashboard for the privacy team</h2>
+    <div class="places">
+      <div class="place"><b>Overview</b><span>The headline result, charts, and the most urgent cases to fix first.</span></div>
+      <div class="place"><b>Case pages</b><span>Every finding, fix and check for one person, with their identity web drawn out.</span></div>
+      <div class="place"><b>Reports</b><span>Download the full results file to hand to the teams who carry out the fixes.</span></div>
+    </div>
+  </section>
+
+  <section>
+    <span class="eyebrow">How well it works</span>
+    <h2>Checked against known answers</h2>
+    <p>On 32 example cases where the correct answer was known, the system got the <strong>complete / incomplete decision right 32 out of 32 times</strong>. It matched the exact fix plan in <strong>30 of 32</strong>. The two misses refer to records that don’t appear anywhere in the evidence provided. All 518 requests are checked in about 30 seconds.</p>
+  </section>
+
+  <section>
+    <span class="eyebrow">Jargon, translated</span>
+    <h2>Glossary</h2>
+    <dl>
+      <dt>Ghost data</dt><dd>Personal data that still exists after a deletion was marked complete.</dd>
+      <dt>Evidence</dt><dd>The files each system left behind: database copies, logs, documents, screenshots.</dd>
+      <dt>Sync pipeline</dt><dd>An automatic connection that copies data from one system to another.</dd>
+      <dt>Redact</dt><dd>Black out the personal parts of a record while keeping the rest.</dd>
+      <dt>Anonymise</dt><dd>Keep the numbers, remove who they belong to.</dd>
+      <dt>Tombstone</dt><dd>A tiny marker that says an account was deleted, holding only its ID.</dd>
+      <dt>Legal hold</dt><dd>An instruction to keep records because of a legal matter.</dd>
+    </dl>
+  </section>
+
+  <script>
+  (() => {
+    // Two illustrative customers (made-up data, real formats) walked through every stage of the audit.
+    const m = (s) => `<span class="mono">${s}</span>`;
+    const STAGES = [
+      { name: "The request", t: 6, what: "Every case starts as one row in Northstar’s request list. It claims the deletion is done. The system doesn’t take its word for it." },
+      { name: "The raw evidence", t: 8, what: "This is what the clues really look like. Every system writes in its own format. The highlighted parts are what the system pays attention to." },
+      { name: "Read into one table", t: 8, what: "The reader turns every format into the same simple row: which record, in which system, holding what, and when it was seen." },
+      { name: "Who is this person?", t: 8, what: "The system collects every email and phone number the customer has ever used, then checks which rows belong to them." },
+      { name: "Follow the trail", t: 7, what: "Starting from the customer, it follows each detail to every record that mentions it. This is the identity web." },
+      { name: "Is anything left?", t: 8, what: "Each record is checked against Northstar’s deletion rules. One record still identifying the person is enough to fail the deletion." },
+      { name: "The fix plan", t: 8, what: "The system writes what it found, the fixes in a safe order, and the checks that prove it worked. Each finding points to its evidence." },
+      { name: "The final answer", t: 7, what: "One row per request goes into output.csv: the case, the verdict, and the full plan. This is what Northstar receives." }
+    ];
+
+    const EX = {
+      a: {
+        who: "Customer A", user: "user_17", verdict: "bad", initial: "A",
+        request: ["case_17", "user_17", "ACCOUNT_DELETION", "COMPLETED", "2026-03-03 09:58", "2026-03-03 10:20"],
+        files: [
+          { id: "evidence_04", name: "account_service.log", kind: "Log", body: "2026-03-03T10:04:12Z level=INFO\nsvc=account_service action=delete_account\nresource_id=<mark>acct_017</mark> result=<mark>success</mark>" },
+          { id: "evidence_12", name: "search_index_export.json", kind: "JSON export", body: "{ \"resource_id\": \"<mark>search_4410</mark>\",\n  \"doc\": { \"name\": \"<mark>Customer A</mark>\",\n           \"email\": \"<mark>a.new@example.com</mark>\" },\n  \"captured_at\": \"2026-03-15T08:30:00Z\" }" },
+          { id: "evidence_31", name: "support_db_snapshot.sql", kind: "Database copy", body: "INSERT INTO tickets\n  (id, requester_email, subject)\nVALUES ('<mark>ticket_8812</mark>',\n  '<mark>a.old@example.com</mark>',\n  'Refund for order 5531');" },
+          { id: "evidence_46", name: "backup_console.png", kind: "Screenshot", shot: { title: "Vault Recovery Manager", rows: [["Archive", "<mark>backup_9287</mark>"], ["Owner", "<mark>a.new@example.com</mark>"], ["Retention", "<mark>Expired 2026-02-28</mark>"]] } }
+        ],
+        rows: [
+          { ev: "evidence_04", src: "Log", sys: "Accounts", rec: "acct_017", holds: "account deleted", when: "3 Mar 10:04", via: ["account ID", "id"] },
+          { ev: "evidence_12", src: "JSON", sys: "Search index", rec: "search_4410", holds: "name, a.new@example.com", when: "15 Mar", via: ["current email", "id"] },
+          { ev: "evidence_31", src: "SQL", sys: "Support", rec: "ticket_8812", holds: "a.old@example.com", when: "14 Mar", via: ["old email", "warn"] },
+          { ev: "evidence_46", src: "Screenshot", ai: true, sys: "Backups", rec: "backup_9287", holds: "a.new@example.com, expired", when: "10 Mar", via: ["current email", "id"] }
+        ],
+        ids: [["a.new@example.com", "current email · since Aug 2025"], ["a.old@example.com", "old email · until Aug 2025 · never given to anyone else", "old"], ["+44 7700 900117", "phone"]],
+        graph: {
+          nodes: [["Customer A", "user_17", 0, "person"], ["account ID", "user_17", 1, "id"], ["current email", "a.new@example.com", 1, "id"], ["old email", "a.old@example.com", 1, "id"],
+                  ["Account", "acct_017", 2, "ok"], ["Search record", "search_4410", 2, "bad"], ["Backup", "backup_9287", 2, "ok"], ["Support ticket", "ticket_8812", 2, "bad"]],
+          edges: [[0, 1], [0, 2], [0, 3], [1, 4], [2, 5], [2, 6], [3, 7]]
+        },
+        checks: [["Account", "acct_017", "Deleted on 3 Mar", "ok", "Gone"], ["Search index", "search_4410", "Must be deleted, but still shows name and email", "bad", "Still there"], ["Support", "ticket_8812", "Must be blacked out, but still shows the old email", "bad", "Still there"], ["Backups", "backup_9287", "Retention expired, so it can no longer be restored", "ok", "Safe"]],
+        summary: "2 of 4 records still identify Customer A",
+        plan: [["FINDING", "p-find", "Search record search_4410 still identifies them", "evidence_12"], ["FINDING", "p-find", "Support ticket ticket_8812 still identifies them", "evidence_31"],
+               ["REMEDIATION", "p-fix", "DELETE search_4410", ""], ["REMEDIATION", "p-fix", "REDACT ticket_8812 (black out the email)", ""],
+               ["VERIFICATION", "p-check", "acct_017 is ABSENT", ""], ["VERIFICATION", "p-check", "search_4410 is ABSENT", ""], ["VERIFICATION", "p-check", "ticket_8812 is REDACTED", ""]],
+        json: ["{\"phase\":\"FINDING\",\"system_id\":\"search_service\",\"resource_id\":\"search_4410\",\"evidence_id\":\"evidence_12\"}", "{\"phase\":\"FINDING\",\"system_id\":\"support_platform\",\"resource_id\":\"ticket_8812\",\"evidence_id\":\"evidence_31\"}", "{\"phase\":\"REMEDIATION\",\"system_id\":\"search_service\",\"resource_id\":\"search_4410\",\"operation\":\"DELETE\"}", "{\"phase\":\"REMEDIATION\",\"system_id\":\"support_platform\",\"resource_id\":\"ticket_8812\",\"operation\":\"REDACT\"}", "{\"phase\":\"VERIFICATION\",\"resource_id\":\"acct_017\",\"state\":\"ABSENT\"}", "{\"phase\":\"VERIFICATION\",\"resource_id\":\"search_4410\",\"state\":\"ABSENT\"}", "{\"phase\":\"VERIFICATION\",\"resource_id\":\"ticket_8812\",\"state\":\"REDACTED\"}"],
+        insights: [
+          "Northstar says <b>COMPLETED</b>. Let’s check.",
+          "Four different formats: a log line, a JSON export, a database copy and a <b>screenshot</b>. Rules can’t read a picture, so Claude AI reads that one.",
+          "The screenshot became a normal row too, marked <b>AI</b>. From here on, the system treats every row the same way.",
+          "The support ticket only mentions the <b>old email</b>. Without the person’s history, this ticket would have been missed completely.",
+          "Red boxes are records that still identify Customer A. The old email is the only path to the support ticket.",
+          "The account is gone and the backup expired. But two records still name them, so the deletion is <b>not</b> complete.",
+          "The order is fixed: first what was found, then the fixes, then the checks. Anyone can open evidence_12 and evidence_31 to double-check.",
+          "Northstar’s report said COMPLETED. The audit says <b>INCOMPLETE</b>, with a 7-step plan to finish the job."
+        ]
+      },
+      b: {
+        who: "Customer B", user: "user_42", verdict: "bad", initial: "B",
+        request: ["case_42", "user_42", "ACCOUNT_DELETION", "COMPLETED", "2026-06-12 09:40", "2026-06-12 10:30"],
+        files: [
+          { id: "evidence_07", name: "account_service.log", kind: "Log", body: "2026-06-12T10:02:55Z level=INFO\nsvc=account_service action=delete_account\nresource_id=<mark>acct_042</mark> result=<mark>success</mark>" },
+          { id: "evidence_19", name: "search_events.jsonl", kind: "JSON log", body: "{\"ts\":\"<mark>2026-06-12T10:04:01Z</mark>\",\n \"svc\":\"search_service\",\n \"event\":\"<mark>document_deleted</mark>\",\n \"resource_id\":\"<mark>search_7731</mark>\"}" },
+          { id: "evidence_22", name: "integration_jobs.log", kind: "Pipe log", body: "<mark>2026-06-13 02:00:14</mark> | integration_service\n | <mark>crm_nightly_sync</mark> | <mark>upsert</mark>\n | search_7731 | email=<mark>b.user@example.com</mark>" },
+          { id: "evidence_27", name: "search_index_export.json", kind: "JSON export", body: "{ \"resource_id\": \"<mark>search_7731</mark>\",\n  \"doc\": { \"email\": \"<mark>b.user@example.com</mark>\" },\n  \"indexed_at\": \"2026-06-13T02:00:14Z\",\n  \"captured_at\": \"<mark>2026-06-20</mark>\" }" }
+        ],
+        rows: [
+          { ev: "evidence_07", src: "Log", sys: "Accounts", rec: "acct_042", holds: "account deleted", when: "12 Jun 10:02", via: ["account ID", "id"] },
+          { ev: "evidence_19", src: "JSON log", sys: "Search index", rec: "search_7731", holds: "record deleted", when: "12 Jun 10:04", via: ["record ID", "id"] },
+          { ev: "evidence_22", src: "Pipe log", sys: "Integration", rec: "crm_nightly_sync", holds: "wrote search_7731 again", when: "13 Jun 02:00", via: ["email", "id"] },
+          { ev: "evidence_27", src: "JSON", sys: "Search index", rec: "search_7731", holds: "b.user@example.com", when: "20 Jun", via: ["email", "id"] }
+        ],
+        ids: [["b.user@example.com", "email · never changed"], ["+44 7700 900442", "phone"]],
+        graph: {
+          nodes: [["Customer B", "user_42", 0, "person"], ["account ID", "user_42", 1, "id"], ["email", "b.user@example.com", 1, "id"],
+                  ["Account", "acct_042", 2, "ok"], ["Search record", "search_7731", 2, "bad"], ["Nightly sync", "crm_nightly_sync", 1, "source"]],
+          edges: [[0, 1], [0, 2], [1, 3], [2, 4], [5, 4, "copies it back in"]]
+        },
+        timeline: [["1", "Created", "long ago", "var(--accent)"], ["2", "Deleted", "12 Jun 10:04", "var(--ok)"], ["3", "Re-created by sync", "13 Jun 02:00", "var(--ghost)"], ["4", "Still there", "20 Jun", "var(--ghost)"]],
+        checks: [["Account", "acct_042", "Deleted on 12 Jun", "ok", "Gone"], ["Search index", "search_7731", "Deleted, then re-created the next night", "bad", "Came back"], ["Integration", "crm_nightly_sync", "Still running, so it will re-create the record again", "bad", "Active"]],
+        summary: "The data came back after deletion, and will keep coming back",
+        plan: [["FINDING", "p-find", "Search record search_7731 was re-created after deletion", "evidence_27"], ["FINDING", "p-find", "Sync crm_nightly_sync is still copying the data", "evidence_22"],
+               ["REMEDIATION", "p-fix", "DISABLE_DATA_FLOW crm_nightly_sync (switch it off first)", ""], ["REMEDIATION", "p-fix", "DELETE search_7731", ""],
+               ["VERIFICATION", "p-check", "acct_042 is ABSENT", ""], ["VERIFICATION", "p-check", "search_7731 is ABSENT", ""], ["VERIFICATION", "p-check", "crm_nightly_sync is DISABLED", ""]],
+        json: ["{\"phase\":\"FINDING\",\"system_id\":\"search_service\",\"resource_id\":\"search_7731\",\"evidence_id\":\"evidence_27\"}", "{\"phase\":\"FINDING\",\"system_id\":\"integration_service\",\"resource_id\":\"crm_nightly_sync\",\"evidence_id\":\"evidence_22\"}", "{\"phase\":\"REMEDIATION\",\"system_id\":\"integration_service\",\"resource_id\":\"crm_nightly_sync\",\"operation\":\"DISABLE_DATA_FLOW\"}", "{\"phase\":\"REMEDIATION\",\"system_id\":\"search_service\",\"resource_id\":\"search_7731\",\"operation\":\"DELETE\"}", "{\"phase\":\"VERIFICATION\",\"resource_id\":\"acct_042\",\"state\":\"ABSENT\"}", "{\"phase\":\"VERIFICATION\",\"resource_id\":\"search_7731\",\"state\":\"ABSENT\"}", "{\"phase\":\"VERIFICATION\",\"resource_id\":\"crm_nightly_sync\",\"state\":\"DISABLED\"}"],
+        insights: [
+          "Northstar says <b>COMPLETED</b> at 10:30 on 12 June. Let’s check.",
+          "Look at the times. The search record was deleted at 10:04 on 12 June, but a sync job <b>wrote it again</b> at 02:00 the next night.",
+          "The same record, search_7731, appears <b>three times</b>: deleted, written again, then still there a week later.",
+          "This customer never changed their email, so matching is simple. No AI was needed for this case either: there were no screenshots.",
+          "The orange box is the nightly sync. It’s not personal data itself, but it keeps <b>copying the data back</b> into search.",
+          "This is called a <b>resurrection</b>: deleted data that comes back. It’s marked critical because deleting it again won’t stick.",
+          "Notice fix 1: <b>switch off the sync first</b>. If you delete the record before that, it’s back the next night.",
+          "Northstar’s report said COMPLETED. The audit says <b>INCOMPLETE</b>, and the fix plan starts by stopping the source."
+        ]
+      }
+    };
+
+    const $ = (id) => document.getElementById(id);
+    const canvas = $("w-canvas"), list = $("w-stages");
+    let ex = "a", stage = 0, timer = null;
+
+    const marks = (html, start) => { let i = 0; return html.replace(/<mark>/g, () => `<mark style="--d:${(start + 0.5 + i++ * 0.18).toFixed(2)}s">`); };
+    const d = (s) => `style="--d:${s.toFixed(2)}s"`;
+
+    function graphSvg(g) {
+      const W = 760, BOX_W = 160, BOX_H = 46, X = [95, 370, 665];
+      const cols = [[], [], []];
+      g.nodes.forEach((n, i) => cols[n[2]].push(i));
+      const rows = Math.max(...cols.map((c) => c.length));
+      const H = rows * 66 + 30;
+      const pos = [];
+      cols.forEach((c, ci) => c.forEach((ni, ri) => { pos[ni] = { x: X[ci], y: (H / (c.length + 1)) * (ri + 1), delay: ci === 0 ? 0 : ci === 1 ? 0.5 + ri * 0.25 : 1.6 + ri * 0.3 }; }));
+      const color = { person: ["var(--accent)", "var(--accent)", "var(--surface)"], id: ["var(--accent-soft)", "var(--accent)", "var(--ink)"], ok: ["var(--ok-soft)", "var(--ok)", "var(--ink)"], bad: ["var(--ghost-soft)", "var(--ghost)", "var(--ink)"], source: ["var(--warn-soft)", "var(--warn)", "var(--ink)"] };
+      const edges = g.edges.map(([a, b, label]) => {
+        const p = pos[a], q = pos[b], x1 = p.x + (q.x > p.x ? BOX_W / 2 : 0), y1 = p.y + (q.x > p.x ? 0 : BOX_H / 2), x2 = q.x - BOX_W / 2, y2 = q.y;
+        const sx = q.x > p.x ? x1 : p.x, sy = q.x > p.x ? y1 : p.y;
+        const t = label ? `<text class="gn" x="${(sx + x2) / 2}" y="${(sy + y2) / 2 - 8}" text-anchor="middle" font-size="12" style="--d:${(q.delay + 0.3).toFixed(2)}s;fill:var(--warn);font-weight:600">${label}</text>` : "";
+        const dash = label ? "stroke-dasharray:6 5;" : "";
+        return `<line class="${label ? "gn" : "gl"}" x1="${sx}" y1="${sy}" x2="${x2}" y2="${y2}" style="--d:${Math.max(0, q.delay - 0.25).toFixed(2)}s;stroke:${label ? "var(--warn)" : "var(--muted)"};stroke-width:2;${dash}"/>${t}`;
+      }).join("");
+      const nodes = g.nodes.map(([label, sub, , kind], i) => {
+        const p = pos[i], [fill, stroke, ink] = color[kind];
+        return `<g class="gn" ${d(p.delay)}><rect x="${p.x - BOX_W / 2}" y="${p.y - BOX_H / 2}" width="${BOX_W}" height="${BOX_H}" rx="10" style="fill:${fill};stroke:${stroke};stroke-width:1.5"/><text x="${p.x}" y="${p.y - 3}" text-anchor="middle" font-size="13" style="fill:${ink};font-weight:600">${label}</text><text x="${p.x}" y="${p.y + 13}" text-anchor="middle" font-size="11" style="fill:${ink};opacity:.75;font-family:var(--mono)">${sub}</text></g>`;
+      }).join("");
+      return `<div class="graph"><svg viewBox="0 0 ${W} ${H}" xmlns="http://www.w3.org/2000/svg" font-family="Source Sans 3, Segoe UI, sans-serif" role="img" aria-label="Identity web for this customer">${edges}${nodes}</svg></div>`;
+    }
+
+    const R = [
+      // 1. the request row
+      (e) => `<div class="csv in"><header>deletion_requests.csv</header><pre><span class="k">case_id, user_id, request_type, reported_status, requested_at, reported_at</span>\n${e.request.map((v, i) => i === 3 ? `<mark style="--d:.8s">${v}</mark>` : v).join(", ")}</pre></div>`,
+      // 2. raw files in their native formats
+      (e) => `<div class="files">${e.files.map((f, i) => `<div class="file in" ${d(i * 0.6)}><header><span>${f.id} · ${f.name}</span><b>${f.kind}</b></header>${f.shot ? `<div class="shot"><div class="shot-bar"><i></i><i></i><i></i>&nbsp;${f.shot.title}</div><dl>${f.shot.rows.map(([k, v]) => `<dt>${k}</dt><dd>${marks(v, i * 0.6)}</dd>`).join("")}</dl></div>` : `<pre>${marks(f.body, i * 0.6)}</pre>`}</div>`).join("")}</div>`,
+      // 3. one normalised table
+      (e) => `<div class="tbl-wrap in"><table class="tbl"><thead><tr><th>Evidence</th><th>Read from</th><th>System</th><th>Record</th><th>Holds</th><th>Seen</th></tr></thead><tbody>${e.rows.map((r, i) => `<tr class="in" ${d(0.3 + i * 0.6)}><td class="mono">${r.ev}</td><td><span class="src${r.ai ? " ai" : ""}">${r.src}${r.ai ? " · AI" : ""}</span></td><td>${r.sys}</td><td class="mono">${r.rec}</td><td>${r.holds}</td><td>${r.when}</td></tr>`).join("")}</tbody></table></div>`,
+      // 4. identity, then match each row
+      (e) => `<div class="profile in"><div class="avatar">${e.initial}</div><div><strong>${e.who}</strong> ${m(e.user)}<div class="ids">${e.ids.map(([v, s, cls], i) => `<div class="idtag in ${cls || ""}" ${d(0.3 + i * 0.3)}><b>${v}</b><span>${s}</span></div>`).join("")}</div></div></div>
+        <div class="tbl-wrap in" ${d(1.3)}><table class="tbl"><thead><tr><th>Record</th><th>System</th><th>Holds</th><th>Belongs to ${e.who}?</th></tr></thead><tbody>${e.rows.map((r, i) => `<tr><td class="mono">${r.rec}</td><td>${r.sys}</td><td>${r.holds}</td><td><span class="chip-s ${r.via[1]} in" ${d(1.8 + i * 0.5)}>✓ matched by ${r.via[0]}</span></td></tr>`).join("")}</tbody></table></div>`,
+      // 5. identity web
+      (e) => graphSvg(e.graph) + `<div class="legend in" ${d(2.6)}><span style="--c: var(--accent)">The person and their details</span><span style="--c: var(--ghost)">Still holds their data</span><span style="--c: var(--ok)">Properly cleaned</span>${e.graph.nodes.some((n) => n[3] === "source") ? `<span style="--c: var(--warn)">Copies data back in</span>` : ""}</div>`,
+      // 6. rules check and verdict
+      (e) => `${e.timeline ? `<div class="timeline in">${e.timeline.map(([n, label, when, c], i) => `<div class="tl in" ${d(0.2 + i * 0.45)}><i style="background:${c}">${n}</i><b>${label}</b><span>${when}</span></div>`).join("")}</div>` : ""}
+        <div class="tbl-wrap in" ${d(e.timeline ? 1.9 : 0.1)}><table class="tbl"><thead><tr><th>System</th><th>Record</th><th>Rule check</th><th>Result</th></tr></thead><tbody>${e.checks.map(([sys, rec, why, cls, label], i) => `<tr><td>${sys}</td><td class="mono">${rec}</td><td>${why}</td><td><span class="chip-s ${cls} in" ${d((e.timeline ? 2.3 : 0.5) + i * 0.55)}>${cls === "ok" ? "✓" : "✗"} ${label}</span></td></tr>`).join("")}</tbody></table></div>
+        <div class="verdict ${e.verdict} in" ${d((e.timeline ? 2.4 : 0.6) + e.checks.length * 0.55)}><div><small class="eyebrow">Verdict</small><br><strong>${e.verdict === "good" ? "COMPLETE" : "INCOMPLETE"}</strong></div><span>${e.summary}</span></div>`,
+      // 7. ordered plan
+      (e) => `<ol class="steps">${e.plan.map(([ph, cls, text, ev], i) => `<li class="in" ${d(0.2 + i * 0.45)}><span class="phase ${cls}">${ph === "REMEDIATION" ? "FIX" : ph === "VERIFICATION" ? "CHECK" : "FOUND"}</span><span>${text}${ev ? ` <span class="ev">· proof: ${ev}</span>` : ""}</span></li>`).join("")}</ol>
+        <div class="groups in" ${d(0.4 + e.plan.length * 0.45)}><span><b class="p-find">Found</b> what’s still there · <b class="p-fix">Fix</b> in a safe order · <b class="p-check">Check</b> to prove it worked</span></div>`,
+      // 8. the CSV row
+      (e) => `<div class="csv in"><header>output.csv</header><pre><span class="k">case_id, deletion_status, steps_json</span>\n${e.request[0]}, <span class="${e.verdict}">${e.verdict === "good" ? "COMPLETE" : "INCOMPLETE"}</span>, [\n${e.json.map((j, i) => `<span class="in" ${d(0.6 + i * 0.3)} style="display:block">  ${j}${i < e.json.length - 1 ? "," : ""}</span>`).join("")}]</pre></div>
+        <div class="verdict ${e.verdict} in" ${d(0.9 + e.json.length * 0.3)}><div><small class="eyebrow">Northstar said</small><br><strong style="color:var(--ink)">COMPLETED</strong></div><span style="font-size:1.4rem">→</span><div><small class="eyebrow">The audit says</small><br><strong>${e.verdict === "good" ? "COMPLETE" : "INCOMPLETE"}</strong></div></div>`
+    ];
+    // the last stage uses inline style twice on one element; keep the delay working
+    const fixStyle = (html) => html.replace(/style="(--d:[\d.]+s)" style="([^"]*)"/g, 'style="$1;$2"');
+
+    function render() {
+      const e = EX[ex], s = STAGES[stage];
+      list.innerHTML = STAGES.map((st, i) => `<li><button class="stage-btn${i < stage ? " done" : ""}" data-i="${i}" ${i === stage ? 'aria-current="step"' : ""}><span>${i + 1}</span><span>${st.name}</span></button></li>`).join("");
+      canvas.innerHTML = `<div class="timer${timer ? " run" : ""}" style="--t:${s.t}s"><i></i></div>
+        <div class="canvas-head"><small>${e.who} · Stage ${stage + 1} of ${STAGES.length}</small><h3>${s.name}</h3><p>${s.what}</p></div>
+        ${fixStyle(R[stage](e))}
+        <div class="insight in" ${d(1.2)}><b>Notice</b><span>${e.insights[stage]}</span></div>`;
+      const cur = list.querySelector('[aria-current="step"]'); if (cur) list.scrollLeft = cur.offsetLeft - 16;
+    }
+    function stop() { clearTimeout(timer); timer = null; $("w-play").textContent = stage >= STAGES.length - 1 ? "↻ Replay" : "▶ Play"; }
+    function go(i) { stage = Math.max(0, Math.min(STAGES.length - 1, i)); render(); }
+    function schedule() { timer = setTimeout(() => { if (stage >= STAGES.length - 1) { stop(); render(); return; } go(stage + 1); schedule(); }, STAGES[stage].t * 1000); }
+    function play() {
+      if (timer) { stop(); render(); return; }
+      if (stage >= STAGES.length - 1) stage = 0;
+      $("w-play").textContent = "❚❚ Pause";
+      timer = -1; render(); schedule();
+    }
+    $("w-play").addEventListener("click", play);
+    $("w-next").addEventListener("click", () => { stop(); go(stage + 1); stop(); });
+    $("w-prev").addEventListener("click", () => { stop(); go(stage - 1); stop(); });
+    list.addEventListener("click", (ev) => { const b = ev.target.closest(".stage-btn"); if (!b) return; stop(); go(+b.dataset.i); stop(); });
+    document.querySelectorAll("#watch .chip").forEach((c) => c.addEventListener("click", () => {
+      document.querySelectorAll("#watch .chip").forEach((x) => x.setAttribute("aria-pressed", String(x === c)));
+      ex = c.dataset.ex; stop(); stage = 0; play();
+    }));
+    render();
+  })();
+  </script>
+
+  <footer>Northstar Deletion Audit Agent · Built by Muskan Goenka and Arshia</footer>
+</main>
